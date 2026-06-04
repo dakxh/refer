@@ -35,10 +35,10 @@ jobs:
           username = generate_random_alpha_string()
           password = generate_random_alpha_string()
 
-          url = "https://exampledomain.com/api/register"
+          url = "https://teens25.vip/api/register"
 
           headers = {
-              "Host": "exampledomain.com",
+              "Host": "teens25.vip",
               "Sec-Ch-Ua-Platform": '"Windows"',
               "Accept-Language": "en-US,en;q=0.9",
               "Sec-Ch-Ua": '"Not-A.Brand";v="24", "Chromium";v="146"',
@@ -46,11 +46,11 @@ jobs:
               "Sec-Ch-Ua-Mobile": "?0",
               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
               "Accept": "*/*",
-              "Origin": "https://exampledomain.com",
+              "Origin": "https://teens25.vip",
               "Sec-Fetch-Site": "same-origin",
               "Sec-Fetch-Mode": "cors",
               "Sec-Fetch-Dest": "empty",
-              "Referer": "https://exampledomain.com",
+              "Referer": "https://teens25.vip/register?invite=07e11298",
               "Accept-Encoding": "gzip, deflate, br",
               "Priority": "u=1, i",
               "Connection": "keep-alive"
