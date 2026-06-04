@@ -1,68 +1,98 @@
-name: WARP Proxy Example
+name: Execute API Registration Request
 
-on:
+# This allows you to manually trigger the workflow from the Actions tab
+on: 
   workflow_dispatch:
 
 jobs:
-  test-warp-proxy:
+  run-request:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Install Cloudflare WARP
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
         run: |
-          # Add Cloudflare gpg key and repository
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          
-          # Install the client
-          sudo apt-get update
-          sudo apt-get install -y cloudflare-warp
+          python -m pip install --upgrade pip
+          pip install requests
 
-      - name: Configure and Connect WARP
+      - name: Create and execute Python script
+        # We use a heredoc (cat << 'EOF') to write the python code to a file, then execute it.
+        # The single quotes around 'EOF' prevent Bash from interpreting any special characters.
         run: |
-          # Register a new client, set mode to proxy, and connect
-          warp-cli --accept-tos registration new
-          warp-cli --accept-tos mode proxy
-          warp-cli --accept-tos connect
-          
-          # Wait a few seconds for the connection to establish
-          sleep 5
-          
-          # Verify the connection through the proxy
-          curl -s -x socks5h://127.0.0.1:40000 https://cloudflare.com/cdn-cgi/trace | grep warp
+          cat << 'EOF' > script.py
+          import requests
+          import random
+          import string
+          import json
 
+          def generate_random_alpha_string(length=11):
+              return ''.join(random.choices(string.ascii_letters, k=length))
 
-      - name: Execute API Request via Proxy
-        run: |
-          # Generate random 11-character alphabetical combinations
-          USERNAME=$(cat /dev/urandom | tr -dc 'a-zA-Z' | fold -w 11 | head -n 1)
-          PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z' | fold -w 11 | head -n 1)
-          
-          # Construct the JSON payload securely
-          PAYLOAD=$(jq -n \
-            --arg username "$USERNAME" \
-            --arg password "$PASSWORD" \
-            --arg ref "07e11298" \
-            '{username: $username, password: $password, repeatPassword: $password, referralCode: $ref}')
+          username = generate_random_alpha_string()
+          password = generate_random_alpha_string()
 
-          # Execute the request using the SOCKS5 proxy
-          # The -i flag includes the HTTP response headers in the output
-          # The -s flag suppresses the progress meter
-          curl -i -s -X POST "https://teens25.vip/api/register" \
-            -x socks5h://127.0.0.1:40000 \
-            -H "Host: teens25.vip" \
-            -H "Sec-Ch-Ua-Platform: \"Windows\"" \
-            -H "Accept-Language: en-US,en;q=0.9" \
-            -H "Sec-Ch-Ua: \"Not-A.Brand\";v=\"24\", \"Chromium\";v=\"146\"" \
-            -H "Content-Type: application/json" \
-            -H "Sec-Ch-Ua-Mobile: ?0" \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" \
-            -H "Accept: */*" \
-            -H "Origin: https://teens25.vip" \
-            -H "Sec-Fetch-Site: same-origin" \
-            -H "Sec-Fetch-Mode: cors" \
-            -H "Sec-Fetch-Dest: empty" \
-            -H "Referer: https://teens25.vip/register?invite=07e11298" \
-            -H "Accept-Encoding: gzip, deflate, br" \
-            -H "Priority: u=1, i" \
-            -H "Connection: keep-alive" \
-            -d "$PAYLOAD"
+          url = "https://exampledomain.com/api/register"
+
+          headers = {
+              "Host": "exampledomain.com",
+              "Sec-Ch-Ua-Platform": '"Windows"',
+              "Accept-Language": "en-US,en;q=0.9",
+              "Sec-Ch-Ua": '"Not-A.Brand";v="24", "Chromium";v="146"',
+              "Content-Type": "application/json",
+              "Sec-Ch-Ua-Mobile": "?0",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+              "Accept": "*/*",
+              "Origin": "https://exampledomain.com",
+              "Sec-Fetch-Site": "same-origin",
+              "Sec-Fetch-Mode": "cors",
+              "Sec-Fetch-Dest": "empty",
+              "Referer": "https://exampledomain.com",
+              "Accept-Encoding": "gzip, deflate, br",
+              "Priority": "u=1, i",
+              "Connection": "keep-alive"
+          }
+
+          payload = {
+              "username": username,
+              "password": password,
+              "repeatPassword": password,
+              "referralCode": "07e11298"
+          }
+
+          print(f"[*] Generated Username: {username}")
+          print(f"[*] Generated Password: {password}")
+          print("[*] Sending POST request...")
+
+          try:
+              response = requests.post(url, headers=headers, json=payload)
+              
+              print("\n" + "="*50)
+              print("RESPONSE STATUS CODE:")
+              print("="*50)
+              print(f"{response.status_code} {response.reason}")
+              
+              print("\n" + "="*50)
+              print("RESPONSE HEADERS:")
+              print("="*50)
+              for key, value in response.headers.items():
+                  print(f"{key}: {value}")
+                  
+              print("\n" + "="*50)
+              print("RESPONSE BODY:")
+              print("="*50)
+              try:
+                  parsed_json = response.json()
+                  print(json.dumps(parsed_json, indent=4))
+              except requests.exceptions.JSONDecodeError:
+                  print(response.text)
+
+          except requests.exceptions.RequestException as e:
+              print(f"\n[!] An error occurred during the request: {e}")
+          EOF
+
+          # Run the script we just generated
+          python script.py
