@@ -1,0 +1,68 @@
+name: WARP Proxy Example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-warp-proxy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cloudflare WARP
+        run: |
+          # Add Cloudflare gpg key and repository
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+          
+          # Install the client
+          sudo apt-get update
+          sudo apt-get install -y cloudflare-warp
+
+      - name: Configure and Connect WARP
+        run: |
+          # Register a new client, set mode to proxy, and connect
+          warp-cli --accept-tos registration new
+          warp-cli --accept-tos mode proxy
+          warp-cli --accept-tos connect
+          
+          # Wait a few seconds for the connection to establish
+          sleep 5
+          
+          # Verify the connection through the proxy
+          curl -s -x socks5h://127.0.0.1:40000 https://cloudflare.com/cdn-cgi/trace | grep warp
+
+
+      - name: Execute API Request via Proxy
+        run: |
+          # Generate random 11-character alphabetical combinations
+          USERNAME=$(cat /dev/urandom | tr -dc 'a-zA-Z' | fold -w 11 | head -n 1)
+          PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z' | fold -w 11 | head -n 1)
+          
+          # Construct the JSON payload securely
+          PAYLOAD=$(jq -n \
+            --arg username "$USERNAME" \
+            --arg password "$PASSWORD" \
+            --arg ref "07e11298" \
+            '{username: $username, password: $password, repeatPassword: $password, referralCode: $ref}')
+
+          # Execute the request using the SOCKS5 proxy
+          # The -i flag includes the HTTP response headers in the output
+          # The -s flag suppresses the progress meter
+          curl -i -s -X POST "https://teens25.vip/api/register" \
+            -x socks5h://127.0.0.1:40000 \
+            -H "Host: teens25.vip" \
+            -H "Sec-Ch-Ua-Platform: \"Windows\"" \
+            -H "Accept-Language: en-US,en;q=0.9" \
+            -H "Sec-Ch-Ua: \"Not-A.Brand\";v=\"24\", \"Chromium\";v=\"146\"" \
+            -H "Content-Type: application/json" \
+            -H "Sec-Ch-Ua-Mobile: ?0" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" \
+            -H "Accept: */*" \
+            -H "Origin: https://teens25.vip" \
+            -H "Sec-Fetch-Site: same-origin" \
+            -H "Sec-Fetch-Mode: cors" \
+            -H "Sec-Fetch-Dest: empty" \
+            -H "Referer: https://teens25.vip/register?invite=07e11298" \
+            -H "Accept-Encoding: gzip, deflate, br" \
+            -H "Priority: u=1, i" \
+            -H "Connection: keep-alive" \
+            -d "$PAYLOAD"
